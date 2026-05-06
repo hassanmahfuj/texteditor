@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveBtn = document.getElementById('save-btn');
     const currentFilenameElement = document.getElementById('current-filename');
     const editorTextArea = document.getElementById('code-editor');
+    const toastContainer = document.getElementById('toast-container');
     
     // Context Menu Elements
     const contextMenu = document.getElementById('context-menu');
@@ -14,6 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let currentFilename = null;
     let contextTargetFile = null;
+    let isProcessing = false;
 
     // Initialize CodeMirror
     const editor = CodeMirror.fromTextArea(editorTextArea, {
@@ -23,13 +25,38 @@ document.addEventListener('DOMContentLoaded', () => {
         lineWrapping: true
     });
 
-    // Function to get CodeMirror mode based on file extension
+    // --- Utility Functions ---
+
+    function showToast(message, type = 'info') {
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.textContent = message;
+        toastContainer.appendChild(toast);
+
+        setTimeout(() => {
+            toast.classList.add('slide-out'); // Note: I should probably add slide-out animation in CSS
+            // For simplicity in this refactor, I'll just remove it
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+
+    async function toggleLoading(loading) {
+        isProcessing = loading;
+        const buttons = [newFileBtn, sampleBtn, formatBtn, saveBtn, renameOption, deleteOption];
+        buttons.forEach(btn => {
+            if (btn) btn.disabled = loading;
+        });
+        // Also disable file list items
+        const listItems = fileListElement.querySelectorAll('li');
+        listItems.forEach(li => li.style.pointerEvents = loading ? 'none' : 'auto');
+    }
+
     function getModeFromFilename(filename) {
         const ext = filename.split('.').pop().toLowerCase();
         switch (ext) {
             case 'py': return 'python';
             case 'js': return 'javascript';
-            case 'java': return 'text/x-java'; // clike mode handles java
+            case 'java': return 'text/x-java';
             case 'json': return 'application/json';
             case 'css': return 'css';
             case 'html': return 'text/html';
@@ -38,130 +65,37 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Function to load file list
+    // --- API Functions ---
+
     async function loadFileList() {
         try {
             const response = await fetch('/api/files');
+            if (!response.ok) throw new Error('Failed to load files');
             const files = await response.json();
             
             fileListElement.innerHTML = '';
             files.forEach(filename => {
                 const li = document.createElement('li');
                 li.textContent = filename;
-                
-                // Left click to open file
                 li.addEventListener('click', () => loadFile(filename));
-
                 fileListElement.appendChild(li);
             });
         } catch (error) {
             console.error('Error loading file list:', error);
+            showToast('Error loading file list', 'error');
         }
     }
 
-    // Context menu delegation
-    fileListElement.addEventListener('contextmenu', (e) => {
-        const li = e.target.closest('li');
-        if (li) {
-            e.preventDefault();
-            const filename = li.textContent;
-            showContextMenu(e, filename);
-        }
-    });
-
-    // Show context menu
-    function showContextMenu(e, filename) {
-        contextTargetFile = filename;
-        contextMenu.style.display = 'block';
-        contextMenu.style.left = `${e.clientX}px`;
-        contextMenu.style.top = `${e.clientY}px`;
-    }
-
-    // Hide context menu when clicking anywhere else
-    document.addEventListener('click', (e) => {
-        if (contextMenu && !contextMenu.contains(e.target)) {
-            contextMenu.style.display = 'none';
-        }
-    });
-
-    // Rename File logic
-    renameOption.addEventListener('click', async () => {
-        if (!contextTargetFile) return;
-        
-        contextMenu.style.display = 'none';
-
-        const newName = prompt('Enter new filename:', contextTargetFile);
-        if (!newName || newName === contextTargetFile) return;
-
-        try {
-            const response = await fetch('/api/rename', {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    old_filename: contextTargetFile,
-                    new_filename: newName
-                }),
-            });
-            const data = await response.json();
-
-            if (data.error) {
-                alert('Error renaming file: ' + data.error);
-            } else {
-                // If the renamed file was the currently open one, update it
-                if (currentFilename === contextTargetFile) {
-                    currentFilename = newName;
-                    currentFilenameElement.textContent = newName;
-                    editor.setOption('mode', getModeFromFilename(newName));
-                }
-                await loadFileList();
-            }
-        } catch (error) {
-            console.error('Error renaming file:', error);
-            alert('Error renaming file. Check console.');
-        }
-    });
-
-    // Delete File logic
-    deleteOption.addEventListener('click', async () => {
-        if (!contextTargetFile) return;
-
-        contextMenu.style.display = 'none';
-
-        if (!confirm(`Are you sure you want to delete ${contextTargetFile}?`)) return;
-
-        try {
-            const response = await fetch(`/api/file/${contextTargetFile}`, {
-                method: 'DELETE',
-            });
-            const data = await response.json();
-
-            if (data.error) {
-                alert('Error deleting file: ' + data.error);
-            } else {
-                // If the deleted file was the currently open one, clear the editor
-                if (currentFilename === contextTargetFile) {
-                    currentFilename = null;
-                    currentFilenameElement.textContent = 'No file selected';
-                    editor.setValue('');
-                }
-                await loadFileList();
-            }
-        } catch (error) {
-            console.error('Error deleting file:', error);
-            alert('Error deleting file. Check console.');
-        }
-    });
-
-    // Function to load a file
     async function loadFile(filename) {
+        if (isProcessing) return;
+        await toggleLoading(true);
+
         try {
             const response = await fetch(`/api/file/${filename}`);
             const data = await response.json();
 
             if (data.error) {
-                alert('Error loading file: ' + data.error);
+                showToast(data.error, 'error');
                 return;
             }
 
@@ -170,7 +104,6 @@ document.addEventListener('DOMContentLoaded', () => {
             editor.setValue(data.content);
             editor.setOption('mode', getModeFromFilename(filename));
 
-            // Update active class in sidebar
             const listItems = fileListElement.querySelectorAll('li');
             listItems.forEach(li => {
                 if (li.textContent === filename) {
@@ -182,49 +115,132 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             console.error('Error loading file:', error);
+            showToast('Error loading file', 'error');
+        } finally {
+            await toggleLoading(false);
         }
     }
 
-    // Function to save current file
     async function saveFile() {
         if (!currentFilename) {
-            alert('No file selected to save!');
+            showToast('No file selected to save!', 'error');
             return;
         }
 
+        await toggleLoading(true);
         const content = editor.getValue();
         try {
             const response = await fetch('/api/save', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    filename: currentFilename,
-                    content: content
-                }),
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename: currentFilename, content }),
             });
             const data = await response.json();
 
             if (data.error) {
-                alert('Error saving file: ' + data.error);
+                showToast(data.error, 'error');
             } else {
-                alert('File saved successfully!');
+                showToast('File saved successfully!', 'success');
             }
         } catch (error) {
             console.error('Error saving file:', error);
-            alert('Error saving file. Check console for details.');
+            showToast('Error saving file', 'error');
+        } finally {
+            await toggleLoading(false);
         }
     }
 
-    // Function to format content
+    async function renameFile(oldName, newName) {
+        await toggleLoading(true);
+        try {
+            const response = await fetch('/api/rename', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ old_filename: oldName, new_filename: newName }),
+            });
+            const data = await response.json();
+
+            if (data.error) {
+                showToast(data.error, 'error');
+            } else {
+                if (currentFilename === oldName) {
+                    currentFilename = newName;
+                    currentFilenameElement.textContent = newName;
+                    editor.setOption('mode', getModeFromFilename(newName));
+                }
+                await loadFileList();
+                showToast('File renamed successfully', 'success');
+            }
+        } catch (error) {
+            console.error('Error renaming file:', error);
+            showToast('Error renaming file', 'error');
+        } finally {
+            await toggleLoading(false);
+        }
+    }
+
+    async function deleteFile(filename) {
+        if (!confirm(`Are you sure you want to delete ${filename}?`)) return;
+
+        await toggleLoading(true);
+        try {
+            const response = await fetch(`/api/file/${filename}`, { method: 'DELETE' });
+            const data = await response.json();
+
+            if (data.error) {
+                showToast(data.error, 'error');
+            } else {
+                if (currentFilename === filename) {
+                    currentFilename = null;
+                    currentFilenameElement.textContent = 'No file selected';
+                    editor.setValue('');
+                }
+                await loadFileList();
+                showToast('File deleted successfully', 'success');
+            }
+        } catch (error) {
+            console.error('Error deleting file:', error);
+            showToast('Error deleting file', 'error');
+        } finally {
+            await toggleLoading(false);
+        }
+    }
+
+    async function createNewFile() {
+        const filename = prompt('Enter new filename (including extension, e.g., hello.py):');
+        if (!filename) return;
+
+        await toggleLoading(true);
+        try {
+            const response = await fetch('/api/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename, content: '' }),
+            });
+            const data = await response.json();
+
+            if (data.error) {
+                showToast(data.error, 'error');
+            } else {
+                await loadFileList();
+                await loadFile(filename);
+                showToast('New file created', 'success');
+            }
+        } catch (error) {
+            console.error('Error creating file:', error);
+            showToast('Error creating file', 'error');
+        } finally {
+            await toggleLoading(false);
+        }
+    }
+
     async function formatContent() {
-        const content = editor.getValue();
         if (!currentFilename) {
-            alert("No file selected to format.");
+            showToast("No file selected to format.", "error");
             return;
         }
 
+        const content = editor.getValue();
         const ext = currentFilename.split('.').pop().toLowerCase();
 
         try {
@@ -232,51 +248,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 const parsed = JSON.parse(content);
                 const formatted = JSON.stringify(parsed, null, 2);
                 editor.setValue(formatted);
+                showToast('JSON formatted', 'success');
             } else {
-                alert("Formatting is currently only supported for JSON files.");
+                showToast("Formatting is currently only supported for JSON files.", "info");
             }
         } catch (e) {
-            alert("Error formatting content: " + e.message);
+            showToast("Error formatting content: " + e.message, "error");
         }
     }
 
-    // Function to create a new file
-    async function createNewFile() {
-        const filename = prompt('Enter new filename (including extension, e.g., hello.py):');
-        if (!filename) return;
-
-        try {
-            // We can use the save API to create a new empty file
-            const response = await fetch('/api/save', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    filename: filename,
-                    content: ''
-                }),
-            });
-            const data = await response.json();
-
-            if (data.error) {
-                alert('Error creating file: ' + data.error);
-            } else {
-                await loadFileList();
-                loadFile(filename);
-            }
-        } catch (error) {
-            console.error('Error creating file:', error);
-        }
-    }
-
-    sampleBtn.addEventListener('click', async () => {
+    async function handleSample() {
         let filename = prompt('Enter sample filename (will append .json):');
         if (!filename) return;
-
-        if (!filename.endsWith('.json')) {
-            filename += '.json';
-        }
+        if (!filename.endsWith('.json')) filename += '.json';
 
         const content = `{
   "configuration": {
@@ -291,35 +275,68 @@ document.addEventListener('DOMContentLoaded', () => {
   "response": {}
 }`;
 
+        await toggleLoading(true);
         try {
             const response = await fetch('/api/save', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    filename: filename,
-                    content: content
-                }),
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename, content }),
             });
             const data = await response.json();
 
             if (data.error) {
-                alert('Error creating sample file: ' + data.error);
+                showToast(data.error, 'error');
             } else {
                 await loadFileList();
-                loadFile(filename);
+                await loadFile(filename);
+                showToast('Sample file created', 'success');
             }
         } catch (error) {
             console.error('Error creating sample file:', error);
-            alert('Error creating sample file. Check console.');
+            showToast('Error creating sample file', 'error');
+        } finally {
+            await toggleLoading(false);
+        }
+    }
+
+    // --- Event Listeners ---
+
+    fileListElement.addEventListener('contextmenu', (e) => {
+        const li = e.target.closest('li');
+        if (li) {
+            e.preventDefault();
+            contextTargetFile = li.textContent;
+            contextMenu.style.display = 'block';
+            contextMenu.style.left = `${e.clientX}px`;
+            contextMenu.style.top = `${e.clientY}px`;
         }
     });
 
-    // Event Listeners
+    document.addEventListener('click', (e) => {
+        if (contextMenu && !contextMenu.contains(e.target)) {
+            contextMenu.style.display = 'none';
+        }
+    });
+
+    renameOption.addEventListener('click', async () => {
+        if (!contextTargetFile) return;
+        contextMenu.style.display = 'none';
+        const newName = prompt('Enter new filename:', contextTargetFile);
+        if (newName && newName !== contextTargetFile) {
+            await renameFile(contextTargetFile, newName);
+        }
+    });
+
+    deleteOption.addEventListener('click', async () => {
+        if (!contextTargetFile) return;
+        contextMenu.style.display = 'none';
+        await deleteFile(contextTargetFile);
+    });
+
     saveBtn.addEventListener('click', saveFile);
     newFileBtn.addEventListener('click', createNewFile);
     formatBtn.addEventListener('click', formatContent);
+    sampleBtn.addEventListener('click', handleSample);
 
     // Initial load
     loadFileList();
