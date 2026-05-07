@@ -69,7 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function loadFileList() {
         try {
-            const response = await fetch('/api/files');
+            const response = await fetch('api/files.php');
             if (!response.ok) throw new Error('Failed to load files');
             const files = await response.json();
             
@@ -91,7 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
         await toggleLoading(true);
 
         try {
-            const response = await fetch(`/api/file/${filename}`);
+            const response = await fetch(`api/file.php?filename=${encodeURIComponent(filename)}`);
             const data = await response.json();
 
             if (data.error) {
@@ -130,7 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
         await toggleLoading(true);
         const content = editor.getValue();
         try {
-            const response = await fetch('/api/save', {
+            const response = await fetch('api/save.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ filename: currentFilename, content }),
@@ -153,7 +153,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function renameFile(oldName, newName) {
         await toggleLoading(true);
         try {
-            const response = await fetch('/api/rename', {
+            const response = await fetch('api/rename.php', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ old_filename: oldName, new_filename: newName }),
@@ -184,7 +184,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         await toggleLoading(true);
         try {
-            const response = await fetch(`/api/file/${filename}`, { method: 'DELETE' });
+            const response = await fetch(`api/file.php?filename=${encodeURIComponent(filename)}`, { method: 'DELETE' });
             const data = await response.json();
 
             if (data.error) {
@@ -212,7 +212,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         await toggleLoading(true);
         try {
-            const response = await fetch('/api/save', {
+            const response = await fetch('api/save.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ filename, content: '' }),
@@ -277,7 +277,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         await toggleLoading(true);
         try {
-            const response = await fetch('/api/save', {
+            const response = await fetch('api/save.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ filename, content }),
