@@ -1,10 +1,1 @@
-__pycache__/
-*.py[cod]
-*$py.class
-venv/
-.env
-files/*
-!files/.gitkeep
-.vscode/
-.idea/
-*.log
+files/
