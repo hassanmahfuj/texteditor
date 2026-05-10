@@ -2,7 +2,7 @@
 require_once 'utils.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
-if ($method !== 'PUT') {
+if ($method !== 'POST') {
     send_json(['error' => 'Method not allowed'], 405);
 }
 

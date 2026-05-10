@@ -154,7 +154,7 @@ document.addEventListener('DOMContentLoaded', () => {
         await toggleLoading(true);
         try {
             const response = await fetch('api/rename.php', {
-                method: 'PUT',
+                method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ old_filename: oldName, new_filename: newName }),
             });
@@ -184,7 +184,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         await toggleLoading(true);
         try {
-            const response = await fetch(`api/file.php?filename=${encodeURIComponent(filename)}`, { method: 'DELETE' });
+            const response = await fetch(`api/file.php?filename=${encodeURIComponent(filename)}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'delete' }),
+            });
             const data = await response.json();
 
             if (data.error) {
