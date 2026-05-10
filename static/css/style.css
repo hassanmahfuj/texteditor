@@ -152,6 +152,40 @@ body, html {
     font-size: 16px;
 }
 
+.CodeMirror-gutters {
+    border-right: 1px solid #30333d;
+}
+
+.CodeMirror-foldgutter {
+    width: 16px;
+}
+
+.CodeMirror-foldgutter-open,
+.CodeMirror-foldgutter-folded {
+    cursor: pointer;
+    color: #636d83;
+    line-height: 1;
+}
+
+.CodeMirror-foldgutter-open:hover,
+.CodeMirror-foldgutter-folded:hover {
+    color: #abb2bf;
+}
+
+.CodeMirror-foldgutter-open::after {
+    content: '▾';
+    font-size: 18px;
+}
+
+.CodeMirror-foldgutter-folded::after {
+    content: '▸';
+    font-size: 18px;
+}
+
+.CodeMirror-gutter {
+    background-color: #282c34;
+}
+
 /* Context Menu Styling */
 .context-menu {
     position: fixed;

@@ -22,7 +22,11 @@ document.addEventListener('DOMContentLoaded', () => {
         lineNumbers: true,
         theme: 'dracula',
         mode: 'text/plain',
-        lineWrapping: true
+        lineWrapping: true,
+        gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter'],
+        foldGutter: {
+            rangeFinder: CodeMirror.fold.brace
+        }
     });
 
     // --- Utility Functions ---
