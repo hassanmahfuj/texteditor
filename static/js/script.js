@@ -1,8 +1,9 @@
 document.addEventListener('DOMContentLoaded', () => {
     const fileListElement = document.getElementById('file-list');
     const newFileBtn = document.getElementById('new-file-btn');
-    const sampleBtn = document.getElementById('sample-btn');
+    const templatesBtn = document.getElementById('templates-btn');
     const formatBtn = document.getElementById('format-btn');
+    const saveAsTemplateBtn = document.getElementById('save-as-template-btn');
     const saveBtn = document.getElementById('save-btn');
     const currentFilenameElement = document.getElementById('current-filename');
     const editorTextArea = document.getElementById('code-editor');
@@ -12,6 +13,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const contextMenu = document.getElementById('context-menu');
     const renameOption = document.getElementById('rename-option');
     const deleteOption = document.getElementById('delete-option');
+
+    // Templates Dialog Elements
+    const templatesDialog = document.getElementById('templates-dialog');
+    const dialogCloseBtn = document.getElementById('dialog-close-btn');
+    const templateListElement = document.getElementById('template-list');
 
     let currentFilename = null;
     let contextTargetFile = null;
@@ -38,19 +44,17 @@ document.addEventListener('DOMContentLoaded', () => {
         toastContainer.appendChild(toast);
 
         setTimeout(() => {
-            toast.classList.add('slide-out'); // Note: I should probably add slide-out animation in CSS
-            // For simplicity in this refactor, I'll just remove it
+            toast.classList.add('slide-out');
             setTimeout(() => toast.remove(), 300);
         }, 3000);
     }
 
     async function toggleLoading(loading) {
         isProcessing = loading;
-        const buttons = [newFileBtn, sampleBtn, formatBtn, saveBtn, renameOption, deleteOption];
+        const buttons = [newFileBtn, templatesBtn, formatBtn, saveAsTemplateBtn, saveBtn, renameOption, deleteOption];
         buttons.forEach(btn => {
             if (btn) btn.disabled = loading;
         });
-        // Also disable file list items
         const listItems = fileListElement.querySelectorAll('li');
         listItems.forEach(li => li.style.pointerEvents = loading ? 'none' : 'auto');
     }
@@ -69,7 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- API Functions ---
+    // --- File API Functions ---
 
     async function loadFileList() {
         try {
@@ -90,10 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function loadFile(filename) {
-        if (isProcessing) return;
-        await toggleLoading(true);
-
+    async function openFile(filename) {
         try {
             const response = await fetch(`api/file.php?filename=${encodeURIComponent(filename)}`);
             const data = await response.json();
@@ -120,6 +121,14 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error('Error loading file:', error);
             showToast('Error loading file', 'error');
+        }
+    }
+
+    async function loadFile(filename) {
+        if (isProcessing) return;
+        await toggleLoading(true);
+        try {
+            await openFile(filename);
         } finally {
             await toggleLoading(false);
         }
@@ -231,7 +240,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 showToast(data.error, 'error');
             } else {
                 await loadFileList();
-                await loadFile(filename);
+                await openFile(filename);
                 showToast('New file created', 'success');
             }
         } catch (error) {
@@ -265,50 +274,163 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function handleSample() {
-        let filename = prompt('Enter sample filename (will append .json):');
-        if (!filename) return;
-        if (!filename.endsWith('.json')) filename += '.json';
+    // --- Template API Functions ---
 
-        const content = `{
-  "configuration": {
-    "CURRENT_DATE": "2024-12-01"
-  },
-  "product": {
-    "scheduleDaysAsDivisor": true,
-    "productCalculationBasedOn": "DAILY"
-  },
-  "account": {},
-  "request": {},
-  "response": {}
-}`;
+    async function loadTemplateList() {
+        try {
+            const response = await fetch('api/templates.php');
+            if (!response.ok) throw new Error('Failed to load templates');
+            const templates = await response.json();
 
+            templateListElement.innerHTML = '';
+
+            if (templates.length === 0) {
+                const li = document.createElement('li');
+                li.textContent = 'No templates available';
+                li.style.color = '#636d83';
+                li.style.cursor = 'default';
+                templateListElement.appendChild(li);
+                return;
+            }
+
+            templates.forEach(name => {
+                const li = document.createElement('li');
+
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'template-name';
+                nameSpan.textContent = name;
+                nameSpan.addEventListener('click', () => useTemplate(name));
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'template-delete-btn';
+                deleteBtn.innerHTML = '✕';
+                deleteBtn.title = 'Delete template';
+                deleteBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    deleteTemplate(name);
+                });
+
+                li.appendChild(nameSpan);
+                li.appendChild(deleteBtn);
+                templateListElement.appendChild(li);
+            });
+        } catch (error) {
+            console.error('Error loading templates:', error);
+            showToast('Error loading templates', 'error');
+        }
+    }
+
+    async function useTemplate(name) {
         await toggleLoading(true);
         try {
-            const response = await fetch('api/save.php', {
+            const response = await fetch(`api/template.php?name=${encodeURIComponent(name)}`);
+            const data = await response.json();
+
+            if (data.error) {
+                showToast(data.error, 'error');
+                return;
+            }
+
+            // Create a new file from template
+            // Carry forward template extension if user doesn't provide one
+            const templateExt = name.includes('.') ? '.' + name.split('.').pop() : '';
+            let filename = prompt('Enter filename for the new file:', name);
+            if (!filename) return;
+            if (templateExt && !filename.includes('.')) {
+                filename += templateExt;
+            }
+
+            const response2 = await fetch('api/save.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ filename, content }),
+                body: JSON.stringify({ filename, content: data.content }),
+            });
+            const data2 = await response2.json();
+
+            if (data2.error) {
+                showToast(data2.error, 'error');
+                return;
+            }
+
+            await loadFileList();
+            await openFile(filename);
+            closeTemplatesDialog();
+            showToast('File created from template', 'success');
+        } catch (error) {
+            console.error('Error using template:', error);
+            showToast('Error using template', 'error');
+        } finally {
+            await toggleLoading(false);
+        }
+    }
+
+    async function deleteTemplate(name) {
+        if (!confirm(`Delete template "${name}"?`)) return;
+
+        try {
+            const response = await fetch('api/template.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'delete', name }),
             });
             const data = await response.json();
 
             if (data.error) {
                 showToast(data.error, 'error');
             } else {
-                await loadFileList();
-                await loadFile(filename);
-                showToast('Sample file created', 'success');
+                await loadTemplateList();
+                showToast('Template deleted', 'success');
             }
         } catch (error) {
-            console.error('Error creating sample file:', error);
-            showToast('Error creating sample file', 'error');
+            console.error('Error deleting template:', error);
+            showToast('Error deleting template', 'error');
+        }
+    }
+
+    async function saveAsTemplate() {
+        const content = editor.getValue();
+        if (!content.trim()) {
+            showToast('Editor is empty, nothing to save as template', 'error');
+            return;
+        }
+
+        const name = prompt('Enter template name (e.g., my-template.json):');
+        if (!name) return;
+
+        await toggleLoading(true);
+        try {
+            const response = await fetch('api/template.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, content }),
+            });
+            const data = await response.json();
+
+            if (data.error) {
+                showToast(data.error, 'error');
+            } else {
+                showToast(`Template "${name}" saved`, 'success');
+            }
+        } catch (error) {
+            console.error('Error saving template:', error);
+            showToast('Error saving template', 'error');
         } finally {
             await toggleLoading(false);
         }
     }
 
+    function openTemplatesDialog() {
+        templatesDialog.classList.add('active');
+        loadTemplateList();
+    }
+
+    function closeTemplatesDialog() {
+        templatesDialog.classList.remove('active');
+    }
+
     // --- Event Listeners ---
 
+    // File context menu
     fileListElement.addEventListener('contextmenu', (e) => {
         const li = e.target.closest('li');
         if (li) {
@@ -341,10 +463,25 @@ document.addEventListener('DOMContentLoaded', () => {
         await deleteFile(contextTargetFile);
     });
 
+    // Templates dialog
+    templatesBtn.addEventListener('click', openTemplatesDialog);
+    dialogCloseBtn.addEventListener('click', closeTemplatesDialog);
+    templatesDialog.addEventListener('click', (e) => {
+        if (e.target === templatesDialog) closeTemplatesDialog();
+    });
+
+    // Toolbar buttons
     saveBtn.addEventListener('click', saveFile);
+    saveAsTemplateBtn.addEventListener('click', saveAsTemplate);
     newFileBtn.addEventListener('click', createNewFile);
     formatBtn.addEventListener('click', formatContent);
-    sampleBtn.addEventListener('click', handleSample);
+
+    // Keyboard shortcut: Escape to close dialog
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && templatesDialog.classList.contains('active')) {
+            closeTemplatesDialog();
+        }
+    });
 
     // Initial load
     loadFileList();

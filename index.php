@@ -32,8 +32,8 @@
             <div class="sidebar-header">
                 <h3>Files</h3>
                 <div class="header-buttons">
-                    <button id="sample-btn">Sample</button>
-                    <button id="new-file-btn">New File</button>
+                    <button id="templates-btn">Templates</button>
+                    <button id="new-file-btn">New</button>
                 </div>
             </div>
             <ul id="file-list">
@@ -45,6 +45,7 @@
                 <span id="current-filename">No file selected</span>
                 <div class="toolbar-buttons">
                     <button id="format-btn">Format</button>
+                    <button id="save-as-template-btn">Save as Template</button>
                     <button id="save-btn">Save</button>
                 </div>
             </div>
@@ -60,6 +61,19 @@
             <li id="rename-option">Rename</li>
             <li id="delete-option" class="delete-item">Delete</li>
         </ul>
+    </div>
+
+    <!-- Templates Dialog -->
+    <div id="templates-dialog" class="dialog-overlay">
+        <div class="dialog">
+            <div class="dialog-header">
+                <h3>Templates</h3>
+                <button id="dialog-close-btn" class="dialog-close-btn">&times;</button>
+            </div>
+            <ul id="template-list" class="template-list">
+                <!-- Templates populated here -->
+            </ul>
+        </div>
     </div>
 
     <div id="toast-container" class="toast-container"></div>

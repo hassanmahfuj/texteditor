@@ -186,6 +186,129 @@ body, html {
     background-color: #282c34;
 }
 
+/* Templates Dialog */
+.dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 3000;
+}
+
+.dialog-overlay.active {
+    display: flex;
+}
+
+.dialog {
+    background-color: #2c3e50;
+    color: #ecf0f1;
+    border-radius: 8px;
+    width: 420px;
+    max-height: 70vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+}
+
+.dialog-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    border-bottom: 1px solid #34495e;
+}
+
+.dialog-header h3 {
+    margin: 0;
+    font-size: 18px;
+}
+
+.dialog-close-btn {
+    background: none;
+    border: none;
+    color: #ecf0f1;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+.dialog-close-btn:hover {
+    color: #e74c3c;
+}
+
+.template-list {
+    list-style: none;
+    padding: 10px 0;
+    margin: 0;
+    overflow-y: auto;
+    flex-grow: 1;
+}
+
+.template-list li {
+    padding: 12px 20px;
+    cursor: pointer;
+    border-bottom: 1px solid #34495e;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background-color 0.2s;
+}
+
+.template-list li:hover {
+    background-color: #34495e;
+}
+
+.template-list li:last-child {
+    border-bottom: none;
+}
+
+.template-list .template-name {
+    flex-grow: 1;
+}
+
+.template-list .template-delete-btn {
+    background: none;
+    border: none;
+    color: #636d83;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.template-list .template-delete-btn:hover {
+    color: #e74c3c;
+    background-color: rgba(231, 76, 60, 0.15);
+}
+
+#save-as-template-btn {
+    padding: 6px 15px;
+    background-color: #16a085;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+#save-as-template-btn:hover {
+    background-color: #1abc9c;
+}
+
+#templates-btn {
+    background-color: #8e44ad;
+    color: white;
+}
+
+#templates-btn:hover {
+    background-color: #9b59b6;
+}
+
 /* Context Menu Styling */
 .context-menu {
     position: fixed;
