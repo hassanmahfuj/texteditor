@@ -1,0 +1,9 @@
+services:
+  texteditor:
+    build: .
+    ports:
+      - "5000:80"
+    volumes:
+      - ./files:/var/www/html/files
+      - ./templates:/var/www/html/templates
+    restart: unless-stopped
